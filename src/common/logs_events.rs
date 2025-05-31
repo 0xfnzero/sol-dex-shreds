@@ -1,7 +1,7 @@
 use base64::engine::general_purpose;
 use base64::Engine;
 use regex::Regex;
-use crate::common::logs_data::{CreateTokenInfo, TradeInfo, EventTrait};
+use crate::common::logs_data::{CreateTokenInfo, TradeInfo, EventTrait, TransferInfo, TipInfo};
 
 pub const PROGRAM_DATA: &str = "Program data: ";
 
@@ -11,6 +11,7 @@ pub enum PumpfunEvent {
     NewDevTrade(TradeInfo),
     NewUserTrade(TradeInfo),
     NewBotTrade(TradeInfo),
+    // NewTip(TipInfo),
     Error(String),
 }
 
@@ -20,6 +21,12 @@ pub enum DexEvent {
     NewToken(CreateTokenInfo),
     NewUserTrade(TradeInfo),
     NewBotTrade(TradeInfo),
+    Error(String),
+}
+
+#[derive(Debug)]
+pub enum SystemEvent {
+    NewTransfer(TransferInfo),
     Error(String),
 }
 
@@ -67,9 +74,10 @@ impl RaydiumEvent {
 
         if !logs.is_empty() {
             let logs_iter = logs.iter().peekable();
-            let re = Regex::new(r"ray_log: (?P<base64>[A-Za-z0-9+/=]+)").unwrap();
 
             for l in logs_iter.rev() {
+                let re = Regex::new(r"ray_log: (?P<base64>[A-Za-z0-9+/=]+)").unwrap();
+
                 if let Some(caps) = re.captures(l) {
                     if let Some(base64) = caps.name("base64") {
                         let bytes = general_purpose::STANDARD.decode(base64.as_str()).unwrap();

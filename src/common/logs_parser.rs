@@ -2,13 +2,15 @@ use std::str::FromStr;
 
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
-use crate::error::{ClientError, ClientResult};
+use crate::common::error::{ClientError, ClientResult};
 use crate::common::{
     logs_data::{DexInstruction, CreateTokenInfo, TradeInfo}, 
     logs_filters::LogFilter
 };
 
 use solana_sdk::pubkey::Pubkey;
+use solana_sdk::instruction::CompiledInstruction;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub async fn process_logs<F>(
     signature: &str,
@@ -170,5 +172,65 @@ pub fn parse_trade_data(data: &str) -> ClientResult<TradeInfo> {
         virtual_token_reserves,
         real_sol_reserves,
         real_token_reserves,
+    })
+}
+
+fn current_timestamp_millis() -> i64 {
+    let duration = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards");
+
+    duration.as_millis() as i64
+}
+
+pub fn parse_instruction_create_token_data(instruction: &CompiledInstruction, accounts: &[Pubkey]) -> ClientResult<CreateTokenInfo> {
+    let data = instruction.data.clone();
+    let mut offset = 0;
+    offset += 8;
+    let len1 = u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap()) as usize;
+    offset += 4;
+    let name = String::from_utf8_lossy(&data[offset..offset + len1]);
+    offset += len1;
+    let len2 = u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap()) as usize;
+    offset += 4;
+    let symbol = String::from_utf8_lossy(&data[offset..offset + len2]);
+    offset += len2;
+    let _flag = u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap());
+    offset += 4;
+    let hash_start = data.len() - 32;
+    let ipfs_bytes = &data[offset..hash_start];
+    let uri = String::from_utf8_lossy(ipfs_bytes);
+    let mint = accounts[instruction.accounts[0] as usize];
+    let user = accounts[instruction.accounts[7] as usize];
+    let bonding_curve= accounts[instruction.accounts[2] as usize];
+    Ok(CreateTokenInfo {
+        slot: 0,
+        name: name.to_string(),
+        symbol: symbol.to_string(),
+        uri: uri.to_string(),
+        mint,
+        bonding_curve,
+        user,
+    })
+}
+
+pub fn parse_instruction_trade_data(instruction: &CompiledInstruction, accounts: &[Pubkey], is_buy: bool) -> ClientResult<TradeInfo> {
+    let data = instruction.data.clone();
+    let amount = u64::from_le_bytes(data[8..16].try_into().unwrap());
+    let max_sol_cost_or_min_sol_output = u64::from_le_bytes(data[16..24].try_into().unwrap()); 
+    let user = accounts[instruction.accounts[6] as usize];
+    let mint = accounts[instruction.accounts[2] as usize];
+    Ok(TradeInfo {
+        slot: 0,
+        mint,
+        sol_amount: max_sol_cost_or_min_sol_output,
+        token_amount: amount,
+        is_buy,
+        user,
+        timestamp: current_timestamp_millis(),
+        virtual_sol_reserves: 0,
+        virtual_token_reserves: 0,
+        real_sol_reserves: 0,
+        real_token_reserves: 0,
     })
 }

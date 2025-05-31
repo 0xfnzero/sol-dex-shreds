@@ -1,13 +1,14 @@
 use borsh::{BorshDeserialize, BorshSerialize};
-use solana_sdk::pubkey::Pubkey;
+use solana_sdk::{pubkey::Pubkey, transaction::VersionedTransaction};
 
-use crate::error::{ClientError, ClientResult};
+use crate::common::error::{ClientError, ClientResult};
 
 #[derive(Debug)]
 pub enum DexInstruction {
     CreateToken(CreateTokenInfo),
     UserTrade(TradeInfo),
     BotTrade(TradeInfo),
+    Tip(TipInfo),
     Other,
 }
 
@@ -38,6 +39,12 @@ pub struct TradeInfo {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, BorshDeserialize, BorshSerialize)]
+pub struct TipInfo {
+    pub slot: u64,
+    pub signature: String,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, BorshDeserialize, BorshSerialize)]
 pub struct CompleteInfo {
     pub user: Pubkey,
     pub mint: Pubkey,
@@ -59,6 +66,13 @@ pub struct SwapBaseInLog {
     pub pool_pc: u64,
     // calc result
     pub out_amount: u64,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct TransferInfo {
+    pub slot: u64,
+    pub signature: String,
+    pub tx: Option<VersionedTransaction>,
 }
 
 pub trait EventTrait: Sized + std::fmt::Debug {
